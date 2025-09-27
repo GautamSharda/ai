@@ -27,9 +27,8 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 # Clone the AI repository
-ARG GITHUB_TOKEN
 WORKDIR /workspace
-RUN git clone https://${GITHUB_TOKEN}@github.com/GautamSharda/ai.git && \
+RUN git clone https://github.com/GautamSharda/ai.git && \
     cd ai
 
 # Create virtual environment and install kaggle
