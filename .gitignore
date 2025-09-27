@@ -47,6 +47,10 @@ Desktop.ini
 # Kaggle credentials (if accidentally placed here)
 kaggle.json
 
+# ARC-AGI extracted data (keep zip files, ignore extracted JSON files)
+arc-agi/*/arc-agi_*.json
+arc-agi/*/sample_submission.json
+
 # Temporary files
 *.tmp
 *.bak

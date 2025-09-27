@@ -1,8 +1,8 @@
 FROM runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
 
-# Ensure curl exists (many RunPod images already include it)
-RUN if ! command -v curl >/dev/null 2>&1; then \
-      apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*; \
+# Ensure curl and unzip exist (many RunPod images already include curl)
+RUN if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then \
+      apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*; \
     fi
 
 # Install nvm + Node (LTS by default)
@@ -26,13 +26,22 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 # Add uv to PATH
 ENV PATH="/root/.local/bin:$PATH"
 
-# Create virtual environment and install kaggle
+# Clone the AI repository
 WORKDIR /workspace
-RUN uv venv && \
+RUN git clone https://github.com/GautamSharda/ai.git && \
+    cd ai
+
+# Create virtual environment and install kaggle
+WORKDIR /workspace/ai
+RUN uv venv .venv && \
     uv pip install kaggle
 
+# Unzip ARC-AGI competition data
+RUN cd arc-agi/arc-agi-2025 && unzip arc-prize-2025.zip && \
+    cd ../arc-agi-2024 && unzip arc-prize-2024.zip
+
 # Activate virtual environment by default
-ENV VIRTUAL_ENV="/workspace/.venv"
+ENV VIRTUAL_ENV="/workspace/ai/.venv"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 CMD ["/bin/bash"]
