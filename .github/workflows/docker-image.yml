@@ -19,12 +19,18 @@
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: cloud
+          endpoint: "gautamsharda/ai-builder"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile
-          push: true
           tags: |
             gautamsharda/ai:latest
             gautamsharda/ai:${{ github.sha }}
+          outputs: ${{ github.event_name == 'pull_request' && 'type=cacheonly' || 'type=registry' }}
