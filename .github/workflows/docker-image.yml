@@ -23,7 +23,7 @@
         uses: docker/setup-buildx-action@v3
         with:
           driver: cloud
-          endpoint: "gautamsharda/ai-builder-0"
+          endpoint: "gautamsharda/ai-builder-1"
 
       - name: Build and push
         uses: docker/build-push-action@v6
