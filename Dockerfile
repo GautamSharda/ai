@@ -28,8 +28,7 @@ ENV PATH="/root/.local/bin:$PATH"
 
 # Clone the AI repository
 WORKDIR /workspace
-RUN git clone https://github.com/GautamSharda/ai.git && \
-    cd ai
+RUN git clone https://github.com/GautamSharda/ai.git
 
 # Create virtual environment and install kaggle
 WORKDIR /workspace/ai
