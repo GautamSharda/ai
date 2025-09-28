@@ -44,4 +44,4 @@ RUN cd arc-agi/arc-agi-2025 && unzip arc-prize-2025.zip && \
 ENV VIRTUAL_ENV="/workspace/ai/.venv"
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-CMD ["/bin/bash"]
+CMD ["sleep", "infinity"]
