@@ -69,24 +69,40 @@ def main():
                 '--format=csv,noheader,nounits'
             ], capture_output=True, text=True, check=True)
 
-            gpu_line = result.stdout.strip()
-            if gpu_line:
-                parts = [part.strip() for part in gpu_line.split(',')]
-                if len(parts) >= 4:
-                    gpu_name, gpu_total, gpu_used, gpu_free = parts[:4]
+            gpu_lines = result.stdout.strip().split('\n')
+            if gpu_lines and gpu_lines[0]:
+                # Process all GPUs
+                total_vram = 0
+                total_used = 0
+                gpu_models = set()
 
-                    gpu_total = int(gpu_total)
-                    gpu_used = int(gpu_used)
-                    gpu_free = int(gpu_free)
+                for i, gpu_line in enumerate(gpu_lines):
+                    parts = [part.strip() for part in gpu_line.split(',')]
+                    if len(parts) >= 4:
+                        gpu_name, gpu_total, gpu_used, gpu_free = parts[:4]
 
-                    gpu_total_gb = mib_to_gb(gpu_total)
-                    gpu_used_gb = mib_to_gb(gpu_used)
-                    gpu_usage_pct = (gpu_used / gpu_total) * 100
+                        gpu_total = int(gpu_total)
+                        gpu_used = int(gpu_used)
+                        gpu_free = int(gpu_free)
 
-                    print(f"   Model: {gpu_name}")
-                    print(f"   VRAM:  {gpu_total_gb} GB total | {gpu_used_gb} GB used ({gpu_usage_pct:.1f}%) | {mib_to_gb(gpu_free)} GB free")
-                else:
-                    raise ValueError("Insufficient GPU data")
+                        total_vram += gpu_total
+                        total_used += gpu_used
+                        gpu_models.add(gpu_name)
+
+                        gpu_total_gb = mib_to_gb(gpu_total)
+                        gpu_used_gb = mib_to_gb(gpu_used)
+                        gpu_usage_pct = (gpu_used / gpu_total) * 100
+
+                        if i == 0:
+                            print(f"   Model: {gpu_name} (×{len(gpu_lines)})")
+                        print(f"   GPU {i}: {gpu_total_gb} GB total | {gpu_used_gb} GB used ({gpu_usage_pct:.1f}%) | {mib_to_gb(gpu_free)} GB free")
+
+                # Show total across all GPUs
+                if len(gpu_lines) > 1:
+                    total_vram_gb = mib_to_gb(total_vram)
+                    total_used_gb = mib_to_gb(total_used)
+                    total_usage_pct = (total_used / total_vram) * 100
+                    print(f"   Total: {total_vram_gb} GB total | {total_used_gb} GB used ({total_usage_pct:.1f}%)")
             else:
                 raise ValueError("No GPU data")
         except (subprocess.CalledProcessError, ValueError):

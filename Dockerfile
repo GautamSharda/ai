@@ -1,5 +1,8 @@
 FROM runpod/pytorch:2.8.0-py3.11-cuda12.8.1-cudnn-devel-ubuntu22.04
 
+# Update system packages and install nano
+RUN apt-get update && apt-get upgrade -y && apt-get install -y nano && rm -rf /var/lib/apt/lists/*
+
 # Ensure curl and unzip exist (many RunPod images already include curl)
 RUN if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then \
       apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*; \
