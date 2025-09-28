@@ -60,3 +60,6 @@ arc-agi/*/sample_submission.json
 # Logs
 *.log
 logs/
+
+# Hugging Face models
+Qwen3-0.6B-Base/

@@ -19,37 +19,74 @@ def get_cpu_model():
 
 
 def bytes_to_gb(bytes_val):
-    """Convert bytes to GB with 1 decimal place"""
-    return round(bytes_val / 1073741824, 1)
+    """Convert bytes to GB (decimal gigabytes) with 1 decimal place"""
+    return round(bytes_val / 1000000000, 1)
 
 
 def mib_to_gb(mib_val):
-    """Convert MiB to GB with 1 decimal place"""
-    return round(mib_val / 1024, 1)
+    """Convert MiB to GB (decimal gigabytes) with 1 decimal place"""
+    return round(mib_val * 1048576 / 1000000000, 1)
 
 
 def get_memory_info():
-    """Get memory usage in a clean format"""
-    if not shutil.which('free'):
-        return "0|0|0|0"
-
+    """Get container memory usage in a clean format"""
     try:
-        result = subprocess.run(['free', '-b'], capture_output=True, text=True, check=True)
-        lines = result.stdout.strip().split('\n')
-        if len(lines) >= 2:
-            # Parse the memory line (second line)
-            mem_line = lines[1].split()
-            if len(mem_line) >= 7:
-                total_bytes = int(mem_line[1])
-                used_bytes = int(mem_line[2])
-                available_bytes = int(mem_line[6])  # available column
+        # Try to get container memory limit first
+        container_limit = None
+        try:
+            with open('/sys/fs/cgroup/memory.max', 'r') as f:
+                limit_str = f.read().strip()
+                if limit_str != "max":
+                    container_limit = int(limit_str)
+        except (FileNotFoundError, PermissionError, ValueError):
+            try:
+                with open('/sys/fs/cgroup/memory/memory.limit_in_bytes', 'r') as f:
+                    container_limit = int(f.read().strip())
+            except (FileNotFoundError, PermissionError, ValueError):
+                pass
 
-                total_gb = total_bytes / 1073741824
-                used_gb = used_bytes / 1073741824
-                free_gb = available_bytes / 1073741824
-                usage_pct = (used_gb / total_gb) * 100
+        # Get current container memory usage
+        container_used = None
+        if container_limit:
+            try:
+                with open('/sys/fs/cgroup/memory.current', 'r') as f:
+                    container_used = int(f.read().strip())
+            except (FileNotFoundError, PermissionError, ValueError):
+                try:
+                    with open('/sys/fs/cgroup/memory/memory.usage_in_bytes', 'r') as f:
+                        container_used = int(f.read().strip())
+                except (FileNotFoundError, PermissionError, ValueError):
+                    pass
 
-                return f"{total_gb:.1f}|{used_gb:.1f}|{free_gb:.1f}|{usage_pct:.1f}"
+        if container_limit and container_used is not None:
+            # Use actual container memory usage
+            total_bytes = container_limit
+            used_bytes = container_used
+            free_bytes = total_bytes - used_bytes
+        else:
+            # Fall back to host memory info
+            if not shutil.which('free'):
+                return "0|0|0|0"
+
+            result = subprocess.run(['free', '-b'], capture_output=True, text=True, check=True)
+            lines = result.stdout.strip().split('\n')
+            if len(lines) >= 2:
+                mem_line = lines[1].split()
+                if len(mem_line) >= 7:
+                    total_bytes = int(mem_line[1])
+                    used_bytes = int(mem_line[2])
+                    free_bytes = int(mem_line[6])
+                else:
+                    return "0|0|0|0"
+            else:
+                return "0|0|0|0"
+
+        total_gb = total_bytes / 1000000000
+        used_gb = used_bytes / 1000000000
+        free_gb = free_bytes / 1000000000
+        usage_pct = (used_gb / total_gb) * 100
+
+        return f"{total_gb:.1f}|{used_gb:.1f}|{free_gb:.1f}|{usage_pct:.1f}"
     except (subprocess.CalledProcessError, ValueError, IndexError):
         pass
 
@@ -151,7 +188,24 @@ def main():
     else:
         actual_cores = get_nproc()
 
-    print(f"   Cores: {actual_cores} cores allocated")
+    # Get physical vs logical core info
+    try:
+        result = subprocess.run(['lscpu'], capture_output=True, text=True, check=True)
+        physical_cores = None
+        threads_per_core = None
+        for line in result.stdout.split('\n'):
+            if 'Core(s) per socket:' in line:
+                physical_cores = int(line.split(':')[1].strip())
+            elif 'Thread(s) per core:' in line:
+                threads_per_core = int(line.split(':')[1].strip())
+
+        if physical_cores and threads_per_core:
+            logical_cores = physical_cores * threads_per_core
+            print(f"   Cores: {physical_cores} physical ({logical_cores} logical with hyperthreading)")
+        else:
+            print(f"   Cores: {actual_cores} cores allocated")
+    except (subprocess.CalledProcessError, ValueError, IndexError):
+        print(f"   Cores: {actual_cores} cores allocated")
 
     print()
 
@@ -174,11 +228,11 @@ def main():
         if len(lines) >= 2:
             df_line = lines[-1].split()
             if len(df_line) >= 4:
-                total = df_line[0].rstrip('G')
-                used = df_line[1].rstrip('G')
-                avail = df_line[2].rstrip('G')
+                total = int(df_line[0].rstrip('G'))
+                used = int(df_line[1].rstrip('G'))
                 pct = df_line[3].rstrip('%')
-                print(f"   Total: {total} GB | Used: {used} GB ({pct}%) | Free: {avail} GB")
+                free = total - used
+                print(f"   Container: {total} GB | Used: {used} GB ({pct}%) | Free: {free} GB")
             else:
                 raise ValueError("Insufficient storage data")
         else:
@@ -186,17 +240,18 @@ def main():
     except (subprocess.CalledProcessError, ValueError):
         print("   Unable to read storage information")
 
-    # Workspace usage
-    workspace_path = os.environ.get('RUNPOD_WORKSPACE_PATH', '/workspace')
-    if os.path.isdir(workspace_path):
+    # Runpod Volume (100GB allocated)
+    if os.path.isdir('/ai_network_volume'):
         try:
-            result = subprocess.run(['du', '-sb', workspace_path],
+            result = subprocess.run(['du', '-sb', '/ai_network_volume'],
                                   capture_output=True, text=True, check=True)
-            workspace_usage_bytes = int(result.stdout.split()[0])
-            workspace_usage_gb = bytes_to_gb(workspace_usage_bytes)
-            print(f"   Workspace: {workspace_usage_gb} GB used in {workspace_path}")
+            ai_volume_usage_bytes = int(result.stdout.split()[0])
+            ai_volume_usage_gb = bytes_to_gb(ai_volume_usage_bytes)
+            usage_pct = (ai_volume_usage_gb / 100) * 100
+            free_gb = 100 - ai_volume_usage_gb
+            print(f"   Runpod Volume (/ai_network_volume): 100 GB | Used: {ai_volume_usage_gb} GB ({usage_pct:.1f}%) | Free: {free_gb:.1f} GB")
         except (subprocess.CalledProcessError, ValueError, IndexError):
-            pass
+            print("   Runpod Volume: Unable to read usage")
 
     print()
     print("==============================================================")
