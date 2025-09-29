@@ -3,6 +3,10 @@ FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 # Update system packages and install nano and git-lfs
 RUN apt-get update && apt-get upgrade -y && apt-get install -y nano git-lfs && rm -rf /var/lib/apt/lists/*
 
+# Configure git user settings
+RUN git config --global user.email "gautamsharda001@gmail.com" && \
+    git config --global user.name "Gautam Sharda"
+
 # Ensure curl and unzip exist (many RunPod images already include curl)
 RUN if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then \
       apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*; \
