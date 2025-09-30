@@ -57,9 +57,5 @@ RUN uv venv .venv && \
 RUN cd arc-agi/arc-agi-2025 && unzip arc-prize-2025.zip && \
     cd ../arc-agi-2024 && unzip arc-prize-2024.zip
 
-# Activate virtual environment by default
-ENV VIRTUAL_ENV="/workspace/ai/.venv"
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
 # Start SSH server and then keep container running
 CMD service ssh start && tail -f /dev/null
