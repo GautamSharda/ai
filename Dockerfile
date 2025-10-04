@@ -50,8 +50,8 @@ RUN git clone https://github.com/GautamSharda/ai.git
 
 # Create virtual environment and install kaggle
 WORKDIR /workspace/ai
-RUN uv venv .venv && \
-    uv pip install kaggle
+# RUN uv venv .venv && \
+#    uv pip install kaggle
 
 # Unzip ARC-AGI competition data
 RUN cd arc-agi/arc-agi-2025 && unzip arc-prize-2025.zip && \
