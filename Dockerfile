@@ -48,7 +48,7 @@ ENV PATH="/root/.local/bin:$PATH"
 WORKDIR /workspace
 RUN git clone https://github.com/GautamSharda/ai.git
 
-# Create virtual environment and install kaggle
+# Create virtual environment
 WORKDIR /workspace/ai
 # RUN uv venv .venv && \
 #    uv pip install kaggle
@@ -56,6 +56,9 @@ WORKDIR /workspace/ai
 # Unzip ARC-AGI competition data
 RUN cd arc-agi/arc-agi-2025 && unzip arc-prize-2025.zip && \
     cd ../arc-agi-2024 && unzip arc-prize-2024.zip
+
+# We will want to use the HF HUB in the network volume
+RUN export HF_HOME=/ai_network_volume/huggingface_cache
 
 # Start SSH server and then keep container running
 CMD service ssh start && tail -f /dev/null
