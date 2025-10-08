@@ -38,7 +38,7 @@ ENV PATH="$NVM_DIR/versions/node/$(bash -lc 'source $NVM_DIR/nvm.sh >/dev/null 2
 RUN bash -lc "source $NVM_DIR/nvm.sh && node -v && npm -v"
 
 # Install Claude Code globally
-RUN bash -lc "source $NVM_DIR/nvm.sh && npm install -g @anthropic-ai/claude-code"
+RUN bash -lc "source $NVM_DIR/nvm.sh && npm install -g @anthropic-ai/claude-code && npm install -g @openai/codex"
 
 # Install uv package manager
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh

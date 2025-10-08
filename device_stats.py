@@ -434,16 +434,17 @@ def main():
     except (subprocess.CalledProcessError, ValueError):
         print("   Unable to read storage information")
 
-    # Runpod Volume (100GB allocated)
+    # Runpod Volume (200GB allocated)
     if os.path.isdir('/ai_network_volume'):
         try:
+            assigned_space = 200
             result = subprocess.run(['du', '-sb', '/ai_network_volume'],
                                   capture_output=True, text=True, check=True)
             ai_volume_usage_bytes = int(result.stdout.split()[0])
             ai_volume_usage_gb = bytes_to_gb(ai_volume_usage_bytes)
-            usage_pct = (ai_volume_usage_gb / 100) * 100
-            free_gb = 100 - ai_volume_usage_gb
-            print(f"   Runpod Volume (/ai_network_volume): 100 GB | Used: {ai_volume_usage_gb} GB ({usage_pct:.1f}%) | Free: {free_gb:.1f} GB")
+            usage_pct = (ai_volume_usage_gb / assigned_space) * 100
+            free_gb = assigned_space - ai_volume_usage_gb
+            print(f"   Runpod Volume (/ai_network_volume): 200 GB | Used: {ai_volume_usage_gb} GB ({usage_pct:.1f}%) | Free: {free_gb:.1f} GB")
 
             # Show top storage consumers in network volume (scaled to match df)
             # Only show top-level directories to avoid double-counting
