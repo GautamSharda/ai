@@ -1,6 +1,6 @@
 FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
-# --- System setup ---
+# --- System setup (unchanged) ---
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y nano git-lfs openssh-server curl unzip && \
     rm -rf /var/lib/apt/lists/*
@@ -16,7 +16,7 @@ RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
 RUN git config --global user.email "gautamsharda001@gmail.com" && \
     git config --global user.name "Gautam Sharda"
 
-# --- Node setup ---
+# --- Node setup (unchanged) ---
 ENV NVM_DIR=/root/.nvm
 RUN mkdir -p "$NVM_DIR" && \
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash && \
@@ -34,11 +34,14 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:/opt/venv/bin:$PATH"
 ENV VIRTUAL_ENV=/opt/venv
 
-# Create venv and install all Python packages
+# Create venv and install PyTorch stack that matches CUDA 12.4.1 (cu121 wheels)
 RUN uv venv /opt/venv && \
     . /opt/venv/bin/activate && \
     uv pip install --index-url https://download.pytorch.org/whl/cu121 \
-        "torch==2.8.0" "torchvision==0.23.0" "torchaudio==2.8.0" && \
+        "torch==2.4.0" "torchvision==0.19.0" "torchaudio==2.4.0"
+
+# Install the rest of your packages into the same venv (torch* intentionally omitted)
+RUN . /opt/venv/bin/activate && \
     uv pip install \
         aiohappyeyeballs==2.6.1 aiohttp==3.12.15 aiosignal==1.4.0 annotated-types==0.7.0 anyio==4.6.0 \
         argon2-cffi==23.1.0 argon2-cffi-bindings==21.2.0 arrow==1.3.0 astor==0.8.1 asttokens==2.4.1 async-lru==2.0.4 \
@@ -61,11 +64,11 @@ RUN uv venv /opt/venv && \
         ray==2.49.2 regex==2025.9.18 requests==2.32.3 rich==14.1.0 safetensors==0.6.2 scipy==1.16.2 sentencepiece==0.2.1 \
         sentry-sdk==2.39.0 setuptools==75.1.0 shellingham==1.5.4 sniffio==1.3.1 soundfile==0.13.1 soupsieve==2.6 soxr==1.0.0 \
         starlette==0.48.0 sympy==1.14.0 tabulate==0.9.0 tiktoken==0.11.0 tokenizers==0.22.1 tornado==6.4.1 tqdm==4.67.1 \
-        transformers==4.57.0 triton==3.4.0 typer==0.19.2 typing-extensions==4.15.0 urllib3==2.2.3 uvicorn==0.37.0 uvloop==0.21.0 \
+        transformers==4.57.0 typer==0.19.2 typing-extensions==4.15.0 urllib3==2.2.3 uvicorn==0.37.0 uvloop==0.21.0 \
         vllm==0.11.0 watchfiles==1.1.0 wcwidth==0.2.13 websocket-client==1.8.0 websockets==15.0.1 wheel==0.44.0 \
         xformers==0.0.32.post1 xgrammar==0.1.25 yarl==1.20.1
 
-# --- Project setup (probably should not do this and instead just bake in a setup script into the container env to be run after start ---
+# --- Your project setup ---
 WORKDIR /workspace
 RUN git clone https://github.com/GautamSharda/ai.git
 WORKDIR /workspace/ai
@@ -74,6 +77,7 @@ WORKDIR /workspace/ai
 RUN cd arc-agi/arc-agi-2025 && unzip arc-prize-2025.zip && \
     cd ../arc-agi-2024 && unzip arc-prize-2024.zip
 
+# Persist HF cache path at runtime
 ENV HF_HOME=/ai_network_volume/huggingface_cache
 
 CMD service ssh start && tail -f /dev/null
