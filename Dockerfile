@@ -1,6 +1,6 @@
 FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
-# --- System setup (unchanged) ---
+# --- System setup ---
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y nano git-lfs openssh-server curl unzip && \
     rm -rf /var/lib/apt/lists/*
@@ -16,7 +16,7 @@ RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
 RUN git config --global user.email "gautamsharda001@gmail.com" && \
     git config --global user.name "Gautam Sharda"
 
-# --- Node setup (unchanged) ---
+# --- Node setup ---
 ENV NVM_DIR=/root/.nvm
 RUN mkdir -p "$NVM_DIR" && \
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash && \
@@ -65,7 +65,7 @@ RUN uv venv /opt/venv && \
         vllm==0.11.0 watchfiles==1.1.0 wcwidth==0.2.13 websocket-client==1.8.0 websockets==15.0.1 wheel==0.44.0 \
         xformers==0.0.32.post1 xgrammar==0.1.25 yarl==1.20.1
 
-# --- Your project setup ---
+# --- Project setup (probably should not do this and instead just bake in a setup script into the container env to be run after start ---
 WORKDIR /workspace
 RUN git clone https://github.com/GautamSharda/ai.git
 WORKDIR /workspace/ai
