@@ -44,7 +44,7 @@ Does this work? 16k tokens, 6-8 tok/s, let's say 7, we want to max out tokens, i
 
 export HF_HOME=/ai_network_volume/huggingface_cache && export HF_HUB_CACHE=/ai_network_volume/huggingface_cache/hub && vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 --max-model-len 32768 --enforce-eager --reasoning-parser deepseek_r1 --tensor-parallel-size 4 --disable-custom-all-reduce --gpu-memory-utilization 0.95 > /ai_network_volume/ai/vllm.log 2>&1
 
-prompt is 16k so needs to be 32k
+prompt is 16k so needs to be 32k -- wasn't enough, reasoning kept going, need more
 
   (2) Inference command:
 
