@@ -38,10 +38,13 @@ So for Qwen3-32B
 
 At FP8 = 1 byte per weight --> 80 billion param = 80 GB
 
+Does this work? 16k tokens, 6-8 tok/s, let's say 7, we want to max out tokens, input tokens for a problem is  
+
 ● (1) Server start command:
 
-  export HF_HOME=/ai_network_volume/huggingface_cache && export HF_HUB_CACHE=/ai_network_volume/huggingface_cache/hub && vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 --port 8000 --tensor-parallel-size 4 --max-model-len 512 --gpu-memory-utilization 0.95
-  --enforce-eager --reasoning-parser deepseek_r1
+export HF_HOME=/ai_network_volume/huggingface_cache && export HF_HUB_CACHE=/ai_network_volume/huggingface_cache/hub && vllm serve Qwen/Qwen3-Next-80B-A3B-Thinking-FP8 --max-model-len 32768 --enforce-eager --reasoning-parser deepseek_r1 --tensor-parallel-size 4 --disable-custom-all-reduce --gpu-memory-utilization 0.95
+
+try 32768 / 2
 
   (2) Inference command:
 
