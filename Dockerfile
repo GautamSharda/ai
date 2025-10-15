@@ -1,48 +1,41 @@
 FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
-# --- System setup (unchanged) ---
+# --- system / ssh / git ---
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y nano git-lfs openssh-server curl unzip && \
     rm -rf /var/lib/apt/lists/*
-
 RUN mkdir /var/run/sshd && \
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config && \
     sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
-
 RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
     echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEZ13uHZJf4V3SMCw22qZKMTm4FSivjsFM53jy14hX1j gautamsharda001@gmail.com" > /root/.ssh/authorized_keys && \
     chmod 600 /root/.ssh/authorized_keys
-
 RUN git config --global user.email "gautamsharda001@gmail.com" && \
     git config --global user.name "Gautam Sharda"
 
-# --- Node setup (unchanged) ---
+# --- node ---
 ENV NVM_DIR=/root/.nvm
 RUN mkdir -p "$NVM_DIR" && \
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash && \
     bash -lc "source $NVM_DIR/nvm.sh && nvm install 18 && nvm alias default 18"
-
 ENV PATH="$NVM_DIR/versions/node/$(bash -lc 'source $NVM_DIR/nvm.sh >/dev/null 2>&1 && nvm version default')/bin:$PATH"
-
 RUN bash -lc "source $NVM_DIR/nvm.sh && node -v && npm -v"
-RUN bash -lc "source $NVM_DIR/nvm.sh && npm install -g @anthropic-ai/claude-code && npm install -g @openai/codex"
+RUN bash -lc "source $NVM_DIR/nvm.sh && npm install -g @anthropic-ai/claude-code @openai/codex"
 
-# -----------------------
-# Python via uv (all deps)
-# -----------------------
+# --- uv + venv ---
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:/opt/venv/bin:$PATH"
-ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="/root/.local/bin:/opt/venv/bin:$PATH" VIRTUAL_ENV=/opt/venv
+RUN uv venv /opt/venv
 
-# Create venv and install PyTorch stack that matches CUDA 12.4.1 (cu121 wheels)
-RUN uv venv /opt/venv && \
-    . /opt/venv/bin/activate && \
-    uv pip install --index-url https://download.pytorch.org/whl/cu121 \
-        "torch==2.4.0" "torchvision==0.19.0" "torchaudio==2.4.0"
-
-# Install the rest of your packages into the same venv (torch* intentionally omitted)
+# 1) Install TORCH via uv (cu121) and pin it
 RUN . /opt/venv/bin/activate && \
-    uv pip install \
+    uv pip install --index-url https://download.pytorch.org/whl/cu121 \
+        torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 && \
+    printf "torch==2.4.0\ntorchvision==0.19.0\ntorchaudio==2.4.0\n" > /tmp/torch-constraints.txt
+
+# 2) Install everything else, but DO NOT upgrade torch (use constraints)
+RUN . /opt/venv/bin/activate && \
+    uv pip install --constraint /tmp/torch-constraints.txt \
         aiohappyeyeballs==2.6.1 aiohttp==3.12.15 aiosignal==1.4.0 annotated-types==0.7.0 anyio==4.6.0 \
         argon2-cffi==23.1.0 argon2-cffi-bindings==21.2.0 arrow==1.3.0 astor==0.8.1 asttokens==2.4.1 async-lru==2.0.4 \
         attrs==24.2.0 babel==2.16.0 beautifulsoup4==4.12.3 blake3==1.0.7 bleach==6.1.0 cachetools==6.2.0 cbor2==5.7.0 \
@@ -68,16 +61,14 @@ RUN . /opt/venv/bin/activate && \
         vllm==0.11.0 watchfiles==1.1.0 wcwidth==0.2.13 websocket-client==1.8.0 websockets==15.0.1 wheel==0.44.0 \
         xformers==0.0.32.post1 xgrammar==0.1.25 yarl==1.20.1
 
-# --- Your project setup ---
+# --- repo ---
 WORKDIR /workspace
 RUN git clone https://github.com/GautamSharda/ai.git
 WORKDIR /workspace/ai
-
-# Unzip ARC-AGI competition data
 RUN cd arc-agi/arc-agi-2025 && unzip arc-prize-2025.zip && \
     cd ../arc-agi-2024 && unzip arc-prize-2024.zip
 
-# Persist HF cache path at runtime
+# HF cache at runtime
 ENV HF_HOME=/ai_network_volume/huggingface_cache
 
 CMD service ssh start && tail -f /dev/null
