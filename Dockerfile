@@ -1,39 +1,64 @@
 FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
-# --- system / ssh / git ---
+# Update system packages and install necessary tools including SSH server
 RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y nano git-lfs openssh-server curl unzip && \
+    apt-get install -y nano git-lfs openssh-server && \
     rm -rf /var/lib/apt/lists/*
+
+# Configure SSH server
 RUN mkdir /var/run/sshd && \
+    # Allow root login with key-based authentication
     sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config && \
+    # Disable password authentication (key-only)
     sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
-RUN mkdir -p /root/.ssh && chmod 700 /root/.ssh && \
+
+# Set up authorized keys with your public key
+RUN mkdir -p /root/.ssh && \
+    chmod 700 /root/.ssh && \
     echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEZ13uHZJf4V3SMCw22qZKMTm4FSivjsFM53jy14hX1j gautamsharda001@gmail.com" > /root/.ssh/authorized_keys && \
     chmod 600 /root/.ssh/authorized_keys
+
+# Configure git user settings
 RUN git config --global user.email "gautamsharda001@gmail.com" && \
     git config --global user.name "Gautam Sharda"
 
-# --- node ---
+# Ensure curl and unzip exist
+RUN if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then \
+      apt-get update && apt-get install -y curl unzip && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+# Install nvm + Node
 ENV NVM_DIR=/root/.nvm
 RUN mkdir -p "$NVM_DIR" && \
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash && \
     bash -lc "source $NVM_DIR/nvm.sh && nvm install 18 && nvm alias default 18"
-ENV PATH="$NVM_DIR/versions/node/$(bash -lc 'source $NVM_DIR/nvm.sh >/dev/null 2>&1 && nvm version default')/bin:$PATH"
-RUN bash -lc "source $NVM_DIR/nvm.sh && node -v && npm -v"
-RUN bash -lc "source $NVM_DIR/nvm.sh && npm install -g @anthropic-ai/claude-code @openai/codex"
 
-# --- uv + venv ---
+ENV PATH="$NVM_DIR/versions/node/$(bash -lc 'source $NVM_DIR/nvm.sh >/dev/null 2>&1 && nvm version default')/bin:$PATH"
+
+RUN bash -lc "source $NVM_DIR/nvm.sh && node -v && npm -v"
+
+# Install Claude Code globally
+RUN bash -lc "source $NVM_DIR/nvm.sh && npm install -g @anthropic-ai/claude-code && npm install -g @openai/codex"
+
+# =======================
+# All Python via uv (pinned Torch; no upgrades)
+# =======================
+# Install uv package manager
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-ENV PATH="/root/.local/bin:/opt/venv/bin:$PATH" VIRTUAL_ENV=/opt/venv
+# Make uv + venv the default Python toolchain for the rest of the image
+ENV PATH="/root/.local/bin:/opt/venv/bin:$PATH"
+ENV VIRTUAL_ENV=/opt/venv
+
+# Create venv
 RUN uv venv /opt/venv
 
-# 1) Install TORCH via uv (cu121) and pin it
+# Install PyTorch stack from cu121 (matches CUDA 12.4.x) and pin via constraints
 RUN . /opt/venv/bin/activate && \
     uv pip install --index-url https://download.pytorch.org/whl/cu121 \
-        torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 && \
+        "torch==2.4.0" "torchvision==0.19.0" "torchaudio==2.4.0" && \
     printf "torch==2.4.0\ntorchvision==0.19.0\ntorchaudio==2.4.0\n" > /tmp/torch-constraints.txt
 
-# 2) Install everything else, but DO NOT upgrade torch (use constraints)
+# Install the rest of your packages into the same venv (torch* intentionally omitted)
 RUN . /opt/venv/bin/activate && \
     uv pip install --constraint /tmp/torch-constraints.txt \
         aiohappyeyeballs==2.6.1 aiohttp==3.12.15 aiosignal==1.4.0 annotated-types==0.7.0 anyio==4.6.0 \
@@ -61,14 +86,26 @@ RUN . /opt/venv/bin/activate && \
         vllm==0.11.0 watchfiles==1.1.0 wcwidth==0.2.13 websocket-client==1.8.0 websockets==15.0.1 wheel==0.44.0 \
         xformers==0.0.32.post1 xgrammar==0.1.25 yarl==1.20.1
 
-# --- repo ---
+# Make venv visible in ALL shells (bash -l, su -, VS Code Remote); add symlinks
+RUN printf 'export VIRTUAL_ENV=/opt/venv\nexport PATH=/opt/venv/bin:$PATH\n' \
+  > /etc/profile.d/uv-venv.sh && \
+  ln -sf /opt/venv/bin/python /usr/local/bin/python && \
+  ln -sf /opt/venv/bin/pip /usr/local/bin/pip && \
+  ln -sf /opt/venv/bin/vllm /usr/local/bin/vllm
+
+# Clone the AI repository
 WORKDIR /workspace
 RUN git clone https://github.com/GautamSharda/ai.git
+
+# Create virtual environment
 WORKDIR /workspace/ai
+
+# Unzip ARC-AGI competition data
 RUN cd arc-agi/arc-agi-2025 && unzip arc-prize-2025.zip && \
     cd ../arc-agi-2024 && unzip arc-prize-2024.zip
 
-# HF cache at runtime
+# Use the HF HUB in the network volume (persist at runtime)
 ENV HF_HOME=/ai_network_volume/huggingface_cache
 
+# Start SSH server and then keep container running
 CMD service ssh start && tail -f /dev/null
