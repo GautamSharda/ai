@@ -52,11 +52,11 @@ ENV VIRTUAL_ENV=/opt/venv
 # Create venv
 RUN uv venv /opt/venv
 
-# Install PyTorch stack from cu121 (matches CUDA 12.4.x) and pin via constraints
+# Upgrade PyTorch stack inside uv venv
 RUN . /opt/venv/bin/activate && \
-    uv pip install --index-url https://download.pytorch.org/whl/cu121 \
-        "torch==2.4.0" "torchvision==0.19.0" "torchaudio==2.4.0" && \
-    printf "torch==2.4.0\ntorchvision==0.19.0\ntorchaudio==2.4.0\n" > /tmp/torch-constraints.txt
+    uv pip install --index-url https://download.pytorch.org/whl/cu124 \
+        torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 && \
+    printf "torch==2.8.0\ntorchvision==0.23.0\ntorchaudio==2.8.0\n" > /tmp/torch-constraints.txt
 
 # Install the rest of your packages into the same venv (torch* intentionally omitted)
 RUN . /opt/venv/bin/activate && \
